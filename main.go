@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,16 +13,18 @@ type apiConfig struct {
 
 func main() {
 	port := "8080"
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
 	cfg := apiConfig{}
 
-	mux.Handle("/app", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("/healthz", healthz)
-	mux.HandleFunc("/metrics", cfg.metrics)
-	mux.HandleFunc("/reset", cfg.metrics)
+	fsHandler := cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+	r.Handle("/app", fsHandler)
+	r.Handle("/app/*", fsHandler)
+	r.Get("/healthz", healthz)
+	r.Get("/metrics", cfg.metrics)
+	r.HandleFunc("/reset", cfg.metrics)
 
-	corsMux := middlewareCors(mux)
+	corsMux := middlewareCors(r)
 	httpServer := &http.Server{
 		Addr:    ":" + port,
 		Handler: corsMux,
@@ -29,10 +32,6 @@ func main() {
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
 }
-
-//func (fileserverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//	http.StripPrefix("/app", http.FileServer(http.Dir(".")))
-//}
 
 func (cfg *apiConfig) reset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits = 0
