@@ -14,15 +14,21 @@ type apiConfig struct {
 func main() {
 	port := "8080"
 	r := chi.NewRouter()
+	apiR := chi.NewRouter()
+	adminR := chi.NewRouter()
+	r.Mount("/api", apiR)
+	r.Mount("/admin", adminR)
 
 	cfg := apiConfig{}
 
 	fsHandler := cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("."))))
 	r.Handle("/app", fsHandler)
 	r.Handle("/app/*", fsHandler)
-	r.Get("/healthz", healthz)
-	r.Get("/metrics", cfg.metrics)
-	r.HandleFunc("/reset", cfg.metrics)
+	apiR.Get("/healthz", healthz)
+	apiR.HandleFunc("/reset", cfg.metrics)
+
+	//adminR.Get("/metrics", cfg.metrics)
+	adminR.Get("/metrics", adminFsHandler)
 
 	corsMux := middlewareCors(r)
 	httpServer := &http.Server{
@@ -43,6 +49,11 @@ func (cfg *apiConfig) metrics(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+}
+
+func adminFsHandler(w http.ResponseWriter, r *http.Request) {
+	//w.Header().Set("Content-Type", "text/html")
+	http.FileServer(http.Dir("./admin/metrics/"))
 }
 
 func healthz(w http.ResponseWriter, r *http.Request) {
