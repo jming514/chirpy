@@ -3,12 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type apiConfig struct {
@@ -28,7 +27,7 @@ func main() {
 	apiR := chi.NewRouter()
 	apiR.Get("/healthz", healthz)
 	apiR.HandleFunc("/reset", cfg.reset)
-	apiR.Post("/validate_chirp", cfg.validateChirp)
+	apiR.Post("/chirp", cfg.chirp)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -45,7 +44,7 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
-func (cfg *apiConfig) validateChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
@@ -60,7 +59,8 @@ func (cfg *apiConfig) validateChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type returnVals struct {
-		CleanedBody string `json:"cleaned_body"`
+		Id   int    `json:"id"`
+		Body string `json:"body"`
 	}
 
 	respVals := returnVals{}
@@ -79,7 +79,8 @@ func (cfg *apiConfig) validateChirp(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		respVals.CleanedBody = strings.Join(res, " ")
+		respVals.Body = strings.Join(res, " ")
+		respVals.Id = 1
 	}
 
 	respondWithJSON(w, 200, respVals)
