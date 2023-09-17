@@ -2,3 +2,4 @@ chirpy
 .idea
 tmp
 .air.toml
+database.json

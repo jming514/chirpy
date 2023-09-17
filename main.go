@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type apiConfig struct {
@@ -26,8 +27,9 @@ func main() {
 
 	apiR := chi.NewRouter()
 	apiR.Get("/healthz", healthz)
-	apiR.HandleFunc("/reset", cfg.reset)
+	apiR.Post("/reset", cfg.reset)
 	apiR.Post("/chirp", cfg.chirp)
+	apiR.Get("/chirps", cfg.chirps)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -42,6 +44,9 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
