@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jming514/chirpy/internals/database"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,6 +20,12 @@ func main() {
 	const port = "8080"
 	const filepathRoot = "."
 
+	db, err := database.NewDB("./database.json")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	cfg := apiConfig{}
 	r := chi.NewRouter()
 	fsHandler := cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
@@ -30,6 +37,7 @@ func main() {
 	apiR.Post("/reset", cfg.reset)
 	apiR.Post("/chirp", cfg.chirp)
 	apiR.Get("/chirps", cfg.chirps)
+	apiR.Post("/chirps", cfg.chirps)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -47,6 +55,7 @@ func main() {
 }
 
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
