@@ -14,6 +14,7 @@ import (
 
 type apiConfig struct {
 	fileserverHits int
+	DB             *database.DB
 }
 
 func main() {
@@ -26,7 +27,10 @@ func main() {
 		return
 	}
 
-	cfg := apiConfig{}
+	cfg := apiConfig{
+		fileserverHits: 0,
+		DB:             db,
+	}
 	r := chi.NewRouter()
 	fsHandler := cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
 	r.Handle("/app", fsHandler)
@@ -35,9 +39,8 @@ func main() {
 	apiR := chi.NewRouter()
 	apiR.Get("/healthz", healthz)
 	apiR.Post("/reset", cfg.reset)
-	apiR.Post("/chirp", cfg.chirp)
-	apiR.Get("/chirps", cfg.chirps)
-	apiR.Post("/chirps", cfg.chirps)
+	//apiR.Get("/chirps", cfg.chirps)
+	apiR.Post("/chirps", cfg.createChirp)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -54,11 +57,7 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
-func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
@@ -67,17 +66,12 @@ func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 	params := parameters{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		log.Printf("Error decoding parameters: %s", err)
+		log.Printf("Error decoding parameters: %s\n", err)
 		respondWithError(w, 500, "Error decoding parameters...")
 		return
 	}
 
-	type returnVals struct {
-		Id   int    `json:"id"`
-		Body string `json:"body"`
-	}
-
-	respVals := returnVals{}
+	var cleanedBody string
 
 	if len(params.Body) > 140 {
 		respondWithError(w, 400, "Chirp is too long")
@@ -93,11 +87,16 @@ func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		respVals.Body = strings.Join(res, " ")
-		respVals.Id = 1
+		cleanedBody = strings.Join(res, " ")
 	}
 
-	respondWithJSON(w, 200, respVals)
+	respVals, err := cfg.DB.CreateChirp(cleanedBody)
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, 500, "error ")
+	}
+
+	respondWithJSON(w, 201, respVals)
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
