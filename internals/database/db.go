@@ -2,9 +2,11 @@ package database
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -80,6 +82,28 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
 
 	return respSlice, nil
+}
+
+func (db *DB) GetChirp(v string) (Chirp, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	id, err := strconv.Atoi(v)
+	if err != nil {
+		fmt.Println("Cannot convert to int")
+		return Chirp{}, err
+	}
+
+	for key, value := range dbStructure.Chirps {
+		if value.Id == id {
+			return dbStructure.Chirps[key], nil
+		}
+	}
+
+	err = errors.New("chirp does not exist")
+	return Chirp{}, err
 }
 
 // ensureDB creates a new database file if it doesn't exist

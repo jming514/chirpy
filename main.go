@@ -40,6 +40,7 @@ func main() {
 	apiR.Get("/healthz", healthz)
 	apiR.Post("/reset", cfg.reset)
 	apiR.Get("/chirps", cfg.chirps)
+	apiR.Get("/chirps/{chirpID}", cfg.chirp)
 	apiR.Post("/chirps", cfg.createChirp)
 	r.Mount("/api", apiR)
 
@@ -55,6 +56,16 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "chirpID")
+	theChirp, err := cfg.DB.GetChirp(id)
+	if err != nil {
+		respondWithError(w, 404, "Chirp doesn't exist")
+	}
+
+	respondWithJSON(w, 200, theChirp)
 }
 
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
