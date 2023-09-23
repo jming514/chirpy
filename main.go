@@ -39,7 +39,7 @@ func main() {
 	apiR := chi.NewRouter()
 	apiR.Get("/healthz", healthz)
 	apiR.Post("/reset", cfg.reset)
-	//apiR.Get("/chirps", cfg.chirps)
+	apiR.Get("/chirps", cfg.chirps)
 	apiR.Post("/chirps", cfg.createChirp)
 	r.Mount("/api", apiR)
 
@@ -55,6 +55,15 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
+	allChirps, err := cfg.DB.GetChirps()
+	if err != nil {
+		respondWithError(w, 500, "Cannot get chirps")
+	}
+
+	respondWithJSON(w, 200, allChirps)
 }
 
 func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {

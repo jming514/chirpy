@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 )
 
@@ -75,6 +76,8 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	for _, v := range dbStructure.Chirps {
 		respSlice = append(respSlice, v)
 	}
+
+	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
 
 	return respSlice, nil
 }
