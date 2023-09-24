@@ -17,6 +17,12 @@ type DB struct {
 
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
+	Users  map[int]User  `json:"users"`
+}
+
+type User struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
 }
 
 type Chirp struct {
@@ -42,6 +48,28 @@ func NewDB(path string) (*DB, error) {
 	return &database, nil
 }
 
+// CreateUser creates a new user and saves it to disk
+func (db *DB) CreateUser(email string) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	size := len(dbStructure.Users)
+	newUser := User{
+		Id:    size + 1,
+		Email: email,
+	}
+	dbStructure.Users[newUser.Id] = newUser
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return User{}, err
+	}
+
+	return newUser, nil
+}
+
 // CreateChirp creates a new chirp and saves it to disk
 func (db *DB) CreateChirp(body string) (Chirp, error) {
 	dbStructure, err := db.loadDB()
@@ -50,12 +78,10 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 	}
 
 	size := len(dbStructure.Chirps)
-
 	newChirp := Chirp{
 		Id:   size + 1,
 		Body: body,
 	}
-
 	dbStructure.Chirps[newChirp.Id] = newChirp
 
 	err = db.writeDB(dbStructure)
@@ -66,6 +92,22 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 	return newChirp, nil
 }
 
+// GetUsers returns all users in the database
+func (db *DB) GetUsers() ([]User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return []User{}, err
+	}
+
+	var respSlice []User
+	for _, v := range dbStructure.Users {
+		respSlice = append(respSlice, v)
+	}
+	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
+
+	return respSlice, nil
+}
+
 // GetChirps returns all chirps in the database
 func (db *DB) GetChirps() ([]Chirp, error) {
 	dbStructure, err := db.loadDB()
@@ -74,14 +116,33 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	}
 
 	var respSlice []Chirp
-
 	for _, v := range dbStructure.Chirps {
 		respSlice = append(respSlice, v)
 	}
-
 	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
 
 	return respSlice, nil
+}
+
+func (db *DB) GetUser(v string) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	id, err := strconv.Atoi(v)
+	if err != nil {
+		return User{}, err
+	}
+
+	for key, value := range dbStructure.Users {
+		if value.Id == id {
+			return dbStructure.Users[key], nil
+		}
+	}
+
+	err = errors.New("user does not exist")
+	return User{}, err
 }
 
 func (db *DB) GetChirp(v string) (Chirp, error) {
@@ -137,6 +198,7 @@ func (db *DB) loadDB() (DBStructure, error) {
 
 	dbStructure := DBStructure{
 		Chirps: map[int]Chirp{},
+		Users:  map[int]User{},
 	}
 
 	file, err := os.OpenFile(db.path, os.O_RDONLY, 0755)

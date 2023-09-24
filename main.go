@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jming514/chirpy/internals/database"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/jming514/chirpy/internals/database"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -42,6 +43,9 @@ func main() {
 	apiR.Get("/chirps", cfg.chirps)
 	apiR.Get("/chirps/{chirpID}", cfg.chirp)
 	apiR.Post("/chirps", cfg.createChirp)
+	apiR.Get("/users", cfg.users)
+	apiR.Get("/users/{userID}", cfg.user)
+	apiR.Post("/users", cfg.createUser)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -56,6 +60,49 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) user(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "userID")
+	theUser, err := cfg.DB.GetUser(id)
+	if err != nil {
+		respondWithError(w, 405, "User doesn't exist")
+	}
+
+	respondWithJSON(w, 200, theUser)
+}
+
+func (cfg *apiConfig) users(w http.ResponseWriter, r *http.Request) {
+	allUsers, err := cfg.DB.GetUsers()
+	if err != nil {
+		respondWithError(w, 500, "Cannot get users")
+	}
+
+	respondWithJSON(w, 200, allUsers)
+}
+
+func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s\n", err)
+		respondWithError(w, 500, "Error decoding parameters...")
+		return
+	}
+
+	email := params.Email
+	respVals, err := cfg.DB.CreateUser(email)
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, 500, "error creating user")
+	}
+
+	respondWithJSON(w, 201, respVals)
 }
 
 func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +160,7 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 	respVals, err := cfg.DB.CreateChirp(cleanedBody)
 	if err != nil {
 		log.Println(err)
-		respondWithError(w, 500, "error ")
+		respondWithError(w, 500, "error creating chirp")
 	}
 
 	respondWithJSON(w, 201, respVals)
