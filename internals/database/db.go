@@ -21,8 +21,15 @@ type DBStructure struct {
 }
 
 type User struct {
-	Id    int    `json:"id"`
-	Email string `json:"email"`
+	Id       int    `json:"id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type UserReturn struct {
+	Id       int    `json:"id"`
+	Email    string `json:"email"`
+	Password string `json:"-"`
 }
 
 type Chirp struct {
@@ -48,26 +55,56 @@ func NewDB(path string) (*DB, error) {
 	return &database, nil
 }
 
-// CreateUser creates a new user and saves it to disk
-func (db *DB) CreateUser(email string) (User, error) {
+// Login checks if user exists with password, and if so, returns the user
+func (db *DB) Login(email, password string) (UserReturn, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {
-		return User{}, err
+		return UserReturn{}, err
+	}
+
+	for _, value := range dbStructure.Users {
+		if value.Email == email && value.Password == password {
+			return UserReturn{
+				Id:    value.Id,
+				Email: value.Email,
+			}, nil
+		}
+	}
+
+	return UserReturn{}, errors.New("user not found")
+}
+
+// CreateUser creates a new user and saves it to disk
+func (db *DB) CreateUser(email string, password string) (UserReturn, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return UserReturn{}, err
+	}
+
+	for _, value := range dbStructure.Users {
+		if value.Email == email {
+			err := errors.New("user already exists")
+			return UserReturn{}, err
+		}
 	}
 
 	size := len(dbStructure.Users)
 	newUser := User{
-		Id:    size + 1,
-		Email: email,
+		Id:       size + 1,
+		Email:    email,
+		Password: password,
 	}
 	dbStructure.Users[newUser.Id] = newUser
 
 	err = db.writeDB(dbStructure)
 	if err != nil {
-		return User{}, err
+		return UserReturn{}, err
 	}
 
-	return newUser, nil
+	return UserReturn{
+		Id:    newUser.Id,
+		Email: newUser.Email,
+	}, nil
 }
 
 // CreateChirp creates a new chirp and saves it to disk

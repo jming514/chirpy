@@ -22,7 +22,7 @@ func main() {
 	const port = "8080"
 	const filepathRoot = "."
 
-	db, err := database.NewDB("./database.json")
+	var db, err = database.NewDB("./database.json")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -40,12 +40,16 @@ func main() {
 	apiR := chi.NewRouter()
 	apiR.Get("/healthz", healthz)
 	apiR.Post("/reset", cfg.reset)
+
 	apiR.Get("/chirps", cfg.chirps)
 	apiR.Get("/chirps/{chirpID}", cfg.chirp)
 	apiR.Post("/chirps", cfg.createChirp)
+
 	apiR.Get("/users", cfg.users)
 	apiR.Get("/users/{userID}", cfg.user)
 	apiR.Post("/users", cfg.createUser)
+
+	apiR.Post("/login", cfg.login)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -60,6 +64,29 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, 500, "Error decoding parameters...")
+		return
+	}
+
+	user, err := cfg.DB.Login(params.Email, params.Password)
+	if err != nil {
+		log.Printf("Error logging in: %s\n", err)
+		respondWithError(w, 401, "Error logging in...")
+		return
+	}
+
+	respondWithJSON(w, 200, user)
 }
 
 func (cfg *apiConfig) user(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +110,8 @@ func (cfg *apiConfig) users(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -95,8 +123,8 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email := params.Email
-	respVals, err := cfg.DB.CreateUser(email)
+	//email := params.Email
+	respVals, err := cfg.DB.CreateUser(params.Email, params.Password)
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, 500, "error creating user")
