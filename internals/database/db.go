@@ -11,8 +11,8 @@ import (
 )
 
 type DB struct {
-	path string
 	mux  *sync.RWMutex
+	path string
 }
 
 type DBStructure struct {
@@ -21,20 +21,20 @@ type DBStructure struct {
 }
 
 type User struct {
-	Id       int    `json:"id"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Id       int    `json:"id"`
 }
 
 type UserReturn struct {
-	Id       int    `json:"id"`
 	Email    string `json:"email"`
 	Password string `json:"-"`
+	Id       int    `json:"id"`
 }
 
 type Chirp struct {
-	Id   int    `json:"id"`
 	Body string `json:"body"`
+	Id   int    `json:"id"`
 }
 
 // NewDB Create a new database connection

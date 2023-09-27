@@ -3,3 +3,4 @@ chirpy
 tmp
 .air.toml
 database.json
+.env

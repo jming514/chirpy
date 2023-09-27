@@ -14,15 +14,15 @@ import (
 )
 
 type apiConfig struct {
-	fileserverHits int
 	DB             *database.DB
+	fileserverHits int
 }
 
 func main() {
 	const port = "8080"
 	const filepathRoot = "."
 
-	var db, err = database.NewDB("./database.json")
+	db, err := database.NewDB("./database.json")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -68,8 +68,9 @@ func main() {
 
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email              string `json:"email"`
+		Password           string `json:"password"`
+		Expires_in_seconds int    `json:"expires_in_seconds"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -123,7 +124,7 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//email := params.Email
+	// email := params.Email
 	respVals, err := cfg.DB.CreateUser(params.Email, params.Password)
 	if err != nil {
 		log.Println(err)
@@ -251,7 +252,7 @@ func (cfg *apiConfig) adminFsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func healthz(w http.ResponseWriter, r *http.Request) {
+func healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte("OK"))
