@@ -8,10 +8,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jming514/chirpy/internals/jwt"
+	"github.com/joho/godotenv"
+
 	"github.com/jming514/chirpy/internals/database"
 
 	"github.com/go-chi/chi/v5"
 )
+
+type userParams struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
 
 type apiConfig struct {
 	DB             *database.DB
@@ -19,6 +27,11 @@ type apiConfig struct {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file", err)
+		return
+	}
 	const port = "8080"
 	const filepathRoot = "."
 
@@ -48,6 +61,7 @@ func main() {
 	apiR.Get("/users", cfg.users)
 	apiR.Get("/users/{userID}", cfg.user)
 	apiR.Post("/users", cfg.createUser)
+	apiR.Put("/users", cfg.updateUser)
 
 	apiR.Post("/login", cfg.login)
 	r.Mount("/api", apiR)
@@ -70,7 +84,7 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email              string `json:"email"`
 		Password           string `json:"password"`
-		Expires_in_seconds int    `json:"expires_in_seconds"`
+		Expires_in_seconds int    `json:"expires_in_seconds,omitempty"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -86,6 +100,14 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, 401, "Error logging in...")
 		return
 	}
+
+	token, err := jwt.CreateToken(params.Expires_in_seconds, user.Id)
+	if err != nil {
+		log.Printf("Error creating token: %s\n", err)
+		respondWithError(w, 500, "error creating token...")
+	}
+
+	user.Token = token
 
 	respondWithJSON(w, 200, user)
 }
@@ -109,14 +131,52 @@ func (cfg *apiConfig) users(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, 200, allUsers)
 }
 
-func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("Authorization")
+
+    strippedToken := strings.TrimPrefix(token, "Bearer ")
+
+	validToken, err := jwt.ValidateToken(strippedToken)
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	userId, err := jwt.GetUserIdFromToken(validToken)
+	if err != nil {
+		log.Printf("Error getting user ID: %s\n", err)
+		respondWithError(w, 401, "cannot read user ID")
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	params := parameters{}
+	params := userParams{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s\n", err)
+		respondWithError(w, 500, "Error decoding parameters...")
+		return
+	}
+
+	update := database.User{
+		Id:       userId,
+		Email:    params.Email,
+		Password: params.Password,
+	}
+
+	respVals, err := cfg.DB.UpdateUser(update)
+	if err != nil {
+		log.Printf("Error updating user: %s\n", err)
+		respondWithError(w, 500, "error updating user")
+	}
+
+	respondWithJSON(w, 200, respVals)
+}
+
+func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	params := userParams{}
 	err := decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s\n", err)

@@ -22,13 +22,14 @@ type DBStructure struct {
 
 type User struct {
 	Email    string `json:"email"`
-	Password string `json:"password"`
+	Password string `json:"password,omitempty"`
 	Id       int    `json:"id"`
 }
 
 type UserReturn struct {
 	Email    string `json:"email"`
 	Password string `json:"-"`
+	Token    string `json:"token,omitempty"`
 	Id       int    `json:"id"`
 }
 
@@ -105,6 +106,37 @@ func (db *DB) CreateUser(email string, password string) (UserReturn, error) {
 		Id:    newUser.Id,
 		Email: newUser.Email,
 	}, nil
+}
+
+func (db *DB) UpdateUser(u User) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	for key, value := range dbStructure.Users {
+		if value.Id == u.Id {
+			// update user
+			updatedUser := User{
+				Id:       value.Id,
+				Email:    u.Email,
+				Password: u.Password,
+			}
+			dbStructure.Users[key] = updatedUser
+
+			err := db.writeDB(dbStructure)
+			if err != nil {
+				return User{}, err
+			}
+
+			return User{
+				Id:    updatedUser.Id,
+				Email: updatedUser.Email,
+			}, nil
+		}
+	}
+
+	return User{}, errors.New("user not found")
 }
 
 // CreateChirp creates a new chirp and saves it to disk
@@ -238,7 +270,7 @@ func (db *DB) loadDB() (DBStructure, error) {
 		Users:  map[int]User{},
 	}
 
-	file, err := os.OpenFile(db.path, os.O_RDONLY, 0755)
+	file, err := os.OpenFile(db.path, os.O_RDONLY, 0o755)
 	if err != nil {
 		return dbStructure, err
 	}
@@ -269,7 +301,7 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 		return err
 	}
 
-	file, err := os.OpenFile(db.path, os.O_RDWR, 0755)
+	file, err := os.OpenFile(db.path, os.O_RDWR, 0o755)
 	if err != nil {
 		return err
 	}
