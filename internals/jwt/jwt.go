@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -8,15 +9,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func CreateToken(expires_in_seconds int, userId int) (string, error) {
-    if expires_in_seconds == 0 {
-        expires_in_seconds = 3600
-    }
+func CreateToken(expires_in_seconds int, userId int, issuer string) (string, error) {
+	if expires_in_seconds == 0 {
+		expires_in_seconds = 3600
+	}
 	currentTime := time.Now()
 	convertedExpiration := time.Second * time.Duration(expires_in_seconds)
 
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy",
+		Issuer:    issuer,
 		Subject:   strconv.Itoa(userId),
 		Audience:  nil,
 		ExpiresAt: jwt.NewNumericDate(currentTime.Add(convertedExpiration)),
@@ -34,12 +35,23 @@ func CreateToken(expires_in_seconds int, userId int) (string, error) {
 }
 
 func ValidateToken(tokenString string) (*jwt.Token, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	claims := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return nil, err
+	}
+
+	if issuer != "chirpy-refresh" {
+		return nil, errors.New("invalid issuer")
+	}
+
 	return token, nil
 }
 

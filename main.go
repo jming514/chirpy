@@ -64,6 +64,7 @@ func main() {
 	apiR.Put("/users", cfg.updateUser)
 
 	apiR.Post("/login", cfg.login)
+	apiR.Post("/refresh", cfg.refresh)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -80,11 +81,25 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
+func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("Authorization")
+
+	strippedToken := strings.TrimPrefix(token, "Bearer ")
+
+	_, err := jwt.ValidateToken(strippedToken)
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	respondWithJSON(w, 200, "ok")
+}
+
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email              string `json:"email"`
-		Password           string `json:"password"`
-		Expires_in_seconds int    `json:"expires_in_seconds,omitempty"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -101,13 +116,15 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := jwt.CreateToken(params.Expires_in_seconds, user.Id)
+	accessToken, err := jwt.CreateToken(60*60, user.Id, "chirpy-access")
+	refreshToken, err := jwt.CreateToken(60*60*24*60, user.Id, "chirpy-refresh")
 	if err != nil {
 		log.Printf("Error creating token: %s\n", err)
 		respondWithError(w, 500, "error creating token...")
 	}
 
-	user.Token = token
+	user.Token = accessToken
+	user.Refresh_Token = refreshToken
 
 	respondWithJSON(w, 200, user)
 }
@@ -134,7 +151,7 @@ func (cfg *apiConfig) users(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("Authorization")
 
-    strippedToken := strings.TrimPrefix(token, "Bearer ")
+	strippedToken := strings.TrimPrefix(token, "Bearer ")
 
 	validToken, err := jwt.ValidateToken(strippedToken)
 	if err != nil {
