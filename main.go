@@ -276,6 +276,7 @@ func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
+
 	type parameters struct {
 		Body string `json:"body"`
 	}

@@ -42,8 +42,9 @@ type UserReturn struct {
 }
 
 type Chirp struct {
-	Body string `json:"body"`
-	Id   int    `json:"id"`
+	Author_Id int    `json:"author_id"`
+	Body      string `json:"body"`
+	Id        int    `json:"id"`
 }
 
 // NewDB Create a new database connection
