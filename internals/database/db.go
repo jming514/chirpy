@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type DB struct {
@@ -18,12 +19,12 @@ type DB struct {
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
 	Users  map[int]User  `json:"users"`
-	Tokens map[int]User  `json:"tokens"`
+	Tokens map[int]Token `json:"tokens"`
 }
 
 type Token struct {
-	Id      string `json:"id"`
-	Revoked string `json:"revoked"`
+	Id         string `json:"id"`
+	RevokeTime string `json:"revokeTime"`
 }
 
 type User struct {
@@ -144,6 +145,41 @@ func (db *DB) UpdateUser(u User) (User, error) {
 	}
 
 	return User{}, errors.New("user not found")
+}
+
+func (db *DB) RevokeToken(token string) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	size := len(dbStructure.Tokens)
+	newRevokedToken := Token{
+		Id:         token,
+		RevokeTime: time.Now().String(),
+	}
+	dbStructure.Tokens[size+1] = newRevokedToken
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) IsTokenRevoked(token string) (bool, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return false, err
+	}
+
+	for _, value := range dbStructure.Tokens {
+		if value.Id == token {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // CreateChirp creates a new chirp and saves it to disk
@@ -275,6 +311,7 @@ func (db *DB) loadDB() (DBStructure, error) {
 	dbStructure := DBStructure{
 		Chirps: map[int]Chirp{},
 		Users:  map[int]User{},
+		Tokens: map[int]Token{},
 	}
 
 	file, err := os.OpenFile(db.path, os.O_RDONLY, 0o755)

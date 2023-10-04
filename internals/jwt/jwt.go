@@ -34,7 +34,8 @@ func CreateToken(expires_in_seconds int, userId int, issuer string) (string, err
 	return signedToken, nil
 }
 
-func ValidateToken(tokenString string) (*jwt.Token, error) {
+// ValidateToken validates a token string. If it is a refresh token, it will return an error
+func ValidateToken(tokenString string, wantedType string) (*jwt.Token, error) {
 	claims := jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("JWT_SECRET")), nil
@@ -48,13 +49,14 @@ func ValidateToken(tokenString string) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	if issuer != "chirpy-refresh" {
+	if issuer != wantedType {
 		return nil, errors.New("invalid issuer")
 	}
 
 	return token, nil
 }
 
+// GetUserIdFromToken gets the user ID from a token
 func GetUserIdFromToken(tokenString *jwt.Token) (int, error) {
 	idString, err := tokenString.Claims.GetSubject()
 	if err != nil {

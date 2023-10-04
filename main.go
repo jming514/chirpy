@@ -65,6 +65,7 @@ func main() {
 
 	apiR.Post("/login", cfg.login)
 	apiR.Post("/refresh", cfg.refresh)
+	apiR.Post("/revoke", cfg.revokeToken)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -81,15 +82,54 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
-func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
+func checkRefreshToken(r *http.Request) (string, error) {
 	token := r.Header.Get("Authorization")
-
 	strippedToken := strings.TrimPrefix(token, "Bearer ")
 
-	_, err := jwt.ValidateToken(strippedToken)
+	_, err := jwt.ValidateToken(strippedToken, "chirpy-refresh")
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		return "", err
+	}
+
+	return strippedToken, nil
+}
+
+func (cfg *apiConfig) revokeToken(w http.ResponseWriter, r *http.Request) {
+	strippedToken, err := checkRefreshToken(r)
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		respondWithError(w, 500, "invalid token")
+	}
+
+	err = cfg.DB.RevokeToken(strippedToken)
+	if err != nil {
+		log.Printf("Error revoking token: %s\n", err)
+		respondWithError(w, 500, "invalid token")
+	}
+}
+
+// refresh if the current token is a refresh token and valid, return a new access token
+func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("Authorization")
+	strippedToken := strings.TrimPrefix(token, "Bearer ")
+
+	_, err := jwt.ValidateToken(strippedToken, "chirpy-refresh")
 	if err != nil {
 		log.Printf("Error validating token: %s\n", err)
 		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	// check db if this token is revoked
+	revoked, err := cfg.DB.IsTokenRevoked(strippedToken)
+	if err != nil {
+		log.Printf("Error checking if token is revoked: %v\n", err)
+		respondWithError(w, 500, "error checking token")
+		return
+	}
+	if revoked == true {
+		respondWithJSON(w, 401, "token is revoked")
 		return
 	}
 
@@ -117,6 +157,10 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accessToken, err := jwt.CreateToken(60*60, user.Id, "chirpy-access")
+	if err != nil {
+		log.Printf("Error creating token: %s\n", err)
+		respondWithError(w, 500, "error creating token...")
+	}
 	refreshToken, err := jwt.CreateToken(60*60*24*60, user.Id, "chirpy-refresh")
 	if err != nil {
 		log.Printf("Error creating token: %s\n", err)
@@ -148,12 +192,13 @@ func (cfg *apiConfig) users(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, 200, allUsers)
 }
 
+// reject if token is a refresh token
 func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("Authorization")
 
 	strippedToken := strings.TrimPrefix(token, "Bearer ")
 
-	validToken, err := jwt.ValidateToken(strippedToken)
+	validToken, err := jwt.ValidateToken(strippedToken, "chirpy-access")
 	if err != nil {
 		log.Printf("Error validating token: %s\n", err)
 		respondWithError(w, 401, "invalid token")
