@@ -208,8 +208,6 @@ func (db *DB) DeleteChirp(chirpId int, userId int) error {
 
 // CreateChirp creates a new chirp and saves it to disk
 func (db *DB) CreateChirp(body string, userId int) (Chirp, error) {
-	log.Println("Creating chirp...")
-
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return Chirp{}, err

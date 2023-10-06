@@ -6,7 +6,7 @@ config:
   http:
     baseURL: http://localhost:8080
 tests:
-  example:
+  delete_chirp:
     steps:
       - name: Create a user
         http:
