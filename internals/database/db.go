@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -183,8 +184,32 @@ func (db *DB) IsTokenRevoked(token string) (bool, error) {
 	return false, nil
 }
 
+func (db *DB) DeleteChirp(chirpId int, userId int) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	for key, value := range dbStructure.Chirps {
+		if value.Id == chirpId && value.Author_Id == userId {
+			delete(dbStructure.Chirps, key)
+			err = db.writeDB(dbStructure)
+			if err != nil {
+				log.Println(err)
+				return err
+			}
+			return nil
+		}
+	}
+
+	return errors.New("chirp not found")
+}
+
 // CreateChirp creates a new chirp and saves it to disk
-func (db *DB) CreateChirp(body string) (Chirp, error) {
+func (db *DB) CreateChirp(body string, userId int) (Chirp, error) {
+	log.Println("Creating chirp...")
+
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return Chirp{}, err
@@ -192,8 +217,9 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 
 	size := len(dbStructure.Chirps)
 	newChirp := Chirp{
-		Id:   size + 1,
-		Body: body,
+		Author_Id: userId,
+		Id:        size + 1,
+		Body:      body,
 	}
 	dbStructure.Chirps[newChirp.Id] = newChirp
 
@@ -346,7 +372,7 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 		return err
 	}
 
-	file, err := os.OpenFile(db.path, os.O_RDWR, 0o755)
+	file, err := os.OpenFile(db.path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o755)
 	if err != nil {
 		return err
 	}

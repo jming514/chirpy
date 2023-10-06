@@ -1,0 +1,105 @@
+version: "1.1"
+name: Delete Chirp Assignment
+env:
+  host: http://localhost:8080
+config:
+  http:
+    baseURL: http://localhost:8080
+tests:
+  example:
+    steps:
+      - name: Create a user
+        http:
+          url: /api/users
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: walt@breakingbad.com
+            password: "123457"
+          check:
+            status: 201
+            jsonpath:
+              $.email: walt@breakingbad.com
+              $.id: 1
+
+      - name: Login as user
+        http:
+          url: /api/login
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: walt@breakingbad.com
+            password: "123457"
+          captures:
+            token:
+              jsonpath: $.token
+          check:
+            status: 200
+
+      - name: Create a chirp
+        http:
+          url: /api/chirps
+          method: POST
+          headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${{captures.token}}"
+          json:
+            body: "I'm the one who knocks!"
+          check:
+            status: 201
+            jsonpath:
+              $.body: "I'm the one who knocks!"
+              "$.author_id": 1
+              $.id: 1
+
+      - name: Create another user
+        http:
+            url: /api/users
+            method: POST
+            headers:
+                Content-Type: application/json
+            json:
+                email: skyler@breakingbad.com
+                password: "000111"
+            check:
+              status: 201
+              jsonpath:
+                $.email: skyler@breakingbad.com
+                $.id: 2
+
+      - name: Login as 2nd user
+        http:
+          url: /api/login
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: skyler@breakingbad.com
+            password: "000111"
+          captures:
+            token2:
+              jsonpath: $.token
+          check:
+            status: 200
+
+      - name: Delete chirp as wrong user
+        http:
+          url: /api/chirps/1
+          method: DELETE
+          headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${{captures.token2}}"
+          check:
+            status: 403
+
+      - name: Delete chirp as correct user
+        http:
+          url: /api/chirps/1
+          method: DELETE
+          headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${{captures.token}}"
+          check:
+            status: 200

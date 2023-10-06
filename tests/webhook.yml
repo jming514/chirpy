@@ -1,0 +1,39 @@
+version: "1.1"
+name: Webhook Assignment
+env:
+  host: http://localhost:8080
+config:
+  http:
+    baseURL: http://localhost:8080
+tests:
+  example:
+    steps:
+      - name: Create a user
+        http:
+          url: /api/users
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: walt@breakingbad.com
+            password: "123457"
+          check:
+            status: 201
+            jsonpath:
+              $.email: walt@breakingbad.com
+              $.id: 1
+
+      - name: Login as user
+        http:
+          url: /api/login
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: walt@breakingbad.com
+            password: "123457"
+          captures:
+            token:
+              jsonpath: $.token
+          check:
+            status: 200

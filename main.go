@@ -57,6 +57,7 @@ func main() {
 	apiR.Get("/chirps", cfg.chirps)
 	apiR.Get("/chirps/{chirpID}", cfg.chirp)
 	apiR.Post("/chirps", cfg.createChirp)
+	apiR.Delete("/chirps/{chirpID}", cfg.deleteChirp)
 
 	apiR.Get("/users", cfg.users)
 	apiR.Get("/users/{userID}", cfg.user)
@@ -82,11 +83,11 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
-func checkRefreshToken(r *http.Request) (string, error) {
+func checkToken(r *http.Request, tokenType string) (string, error) {
 	token := r.Header.Get("Authorization")
 	strippedToken := strings.TrimPrefix(token, "Bearer ")
 
-	_, err := jwt.ValidateToken(strippedToken, "chirpy-refresh")
+	_, err := jwt.ValidateToken(strippedToken, tokenType)
 	if err != nil {
 		log.Printf("Error validating token: %s\n", err)
 		return "", err
@@ -96,7 +97,7 @@ func checkRefreshToken(r *http.Request) (string, error) {
 }
 
 func (cfg *apiConfig) revokeToken(w http.ResponseWriter, r *http.Request) {
-	strippedToken, err := checkRefreshToken(r)
+	strippedToken, err := checkToken(r, "chirpy-refresh")
 	if err != nil {
 		log.Printf("Error validating token: %s\n", err)
 		respondWithError(w, 500, "invalid token")
@@ -111,14 +112,10 @@ func (cfg *apiConfig) revokeToken(w http.ResponseWriter, r *http.Request) {
 
 // refresh if the current token is a refresh token and valid, return a new access token
 func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	strippedToken := strings.TrimPrefix(token, "Bearer ")
-
-	_, err := jwt.ValidateToken(strippedToken, "chirpy-refresh")
+	strippedToken, err := checkToken(r, "chirpy-refresh")
 	if err != nil {
 		log.Printf("Error validating token: %s\n", err)
-		respondWithError(w, 401, "invalid token")
-		return
+		respondWithError(w, 500, "invalid token")
 	}
 
 	// check db if this token is revoked
@@ -251,6 +248,7 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, 500, "error creating user")
+		return
 	}
 
 	respondWithJSON(w, 201, respVals)
@@ -269,21 +267,44 @@ func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
 	allChirps, err := cfg.DB.GetChirps()
 	if err != nil {
+		log.Printf("Error getting chirps: %s\n", err)
 		respondWithError(w, 500, "Cannot get chirps")
+		return
 	}
 
 	respondWithJSON(w, 200, allChirps)
 }
 
 func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
+	// Get user id from the token
+	token := r.Header.Get("Authorization")
+
+	strippedToken := strings.TrimPrefix(token, "Bearer ")
+
+	validToken, err := jwt.ValidateToken(strippedToken, "chirpy-access")
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+	userId, err := jwt.GetUserIdFromToken(validToken)
+	if err != nil {
+		log.Printf("Error getting user ID: %s\n", err)
+		respondWithError(w, 401, "cannot read user ID")
+		return
+	}
 
 	type parameters struct {
-		Body string `json:"body"`
+		Body   string `json:"body"`
+		UserId int    `json:"userId"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	params := parameters{}
-	err := decoder.Decode(&params)
+	params := parameters{
+		UserId: userId,
+	}
+
+	err = decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s\n", err)
 		respondWithError(w, 500, "Error decoding parameters...")
@@ -309,13 +330,51 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 		cleanedBody = strings.Join(res, " ")
 	}
 
-	respVals, err := cfg.DB.CreateChirp(cleanedBody)
+	respVals, err := cfg.DB.CreateChirp(cleanedBody, params.UserId)
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, 500, "error creating chirp")
 	}
 
 	respondWithJSON(w, 201, respVals)
+}
+
+func (cfg *apiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
+	// get token
+	token := r.Header.Get("Authorization")
+
+	strippedToken := strings.TrimPrefix(token, "Bearer ")
+
+	validToken, err := jwt.ValidateToken(strippedToken, "chirpy-access")
+	if err != nil {
+		log.Printf("Error validating token: %s\n", err)
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	// get user id from token
+	userId, err := jwt.GetUserIdFromToken(validToken)
+	if err != nil {
+		log.Printf("Error getting user ID: %s\n", err)
+		respondWithError(w, 401, "cannot read user ID")
+		return
+	}
+
+	chirpId := chi.URLParam(r, "chirpID")
+	chirpIdInt, err := strconv.Atoi(chirpId)
+	if err != nil {
+		log.Printf("Error converting chirp ID to int: %s\n", err)
+		respondWithError(w, 500, "Invalid chirp ID")
+		return
+	}
+
+	err = cfg.DB.DeleteChirp(chirpIdInt, userId)
+	if err != nil {
+		log.Printf("Error deleting chirp: %s\n", err)
+		respondWithError(w, 403, "Cannot delete chirp")
+		return
+	}
+	respondWithJSON(w, 200, "ok")
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
