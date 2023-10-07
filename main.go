@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -86,6 +87,16 @@ func main() {
 }
 
 func (cfg *apiConfig) webhooks(w http.ResponseWriter, r *http.Request) {
+	apiKey := r.Header.Get("Authorization")
+	strippedKey := strings.TrimPrefix(apiKey, "ApiKey ")
+
+	goodKey := os.Getenv("API_KEY")
+
+	if goodKey != strippedKey {
+		respondWithError(w, 401, "unauthorized")
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := database.UpgradeUserStruct{}
 	err := decoder.Decode(&params)
