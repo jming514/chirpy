@@ -303,9 +303,24 @@ func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
-	authorId := r.URL.Query().Get("author_id")
+	options := database.Options{}
 
-	allChirps, err := cfg.DB.GetChirps(authorId)
+	authorId := r.URL.Query().Get("author_id")
+	sorting := r.URL.Query().Get("sort")
+
+	if authorId != "" {
+		id, err := strconv.Atoi(authorId)
+		if err != nil {
+			options.AuthorId = 0
+		} else {
+			options.AuthorId = id
+		}
+	}
+	if sorting != "" {
+		options.Sorting = sorting
+	}
+
+	allChirps, err := cfg.DB.GetChirps(options)
 	if err != nil {
 		log.Printf("Error getting chirps: %s\n", err)
 		respondWithError(w, 500, "Cannot get chirps")

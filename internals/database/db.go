@@ -259,16 +259,13 @@ func (db *DB) GetUsers() ([]User, error) {
 	return respSlice, nil
 }
 
-// GetChirps returns all chirps in the database
-func (db *DB) GetChirps(authorId string) ([]Chirp, error) {
-	var id int
-	var err error
+type Options struct {
+	AuthorId int
+	Sorting  string
+}
 
-	if len(authorId) == 0 {
-		id = 0
-	} else {
-		id, err = strconv.Atoi(authorId)
-	}
+// GetChirps returns all chirps in the database
+func (db *DB) GetChirps(options Options) ([]Chirp, error) {
 
 	dbStructure, err := db.loadDB()
 	if err != nil {
@@ -277,15 +274,19 @@ func (db *DB) GetChirps(authorId string) ([]Chirp, error) {
 
 	var respSlice []Chirp
 	for _, v := range dbStructure.Chirps {
-		if id == 0 {
-			respSlice = append(respSlice, v)
-		} else {
-			if v.Author_Id == id {
+		if options.AuthorId != 0 {
+			if v.Author_Id == options.AuthorId {
 				respSlice = append(respSlice, v)
 			}
+		} else {
+			respSlice = append(respSlice, v)
 		}
 	}
-	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
+	if options.Sorting == "desc" {
+		sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id > respSlice[j].Id })
+	} else {
+		sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
+	}
 
 	return respSlice, nil
 }
