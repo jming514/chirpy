@@ -29,14 +29,16 @@ type Token struct {
 }
 
 type User struct {
-	Email    string `json:"email"`
-	Password string `json:"password,omitempty"`
-	Id       int    `json:"id"`
+	Email         string `json:"email"`
+	Password      string `json:"password,omitempty"`
+	Is_Chirpy_Red bool   `json:"is_chirpy_red"`
+	Id            int    `json:"id"`
 }
 
 type UserReturn struct {
 	Email         string `json:"email"`
 	Password      string `json:"-"`
+	Is_Chirpy_Red bool   `json:"is_chirpy_red"`
 	Token         string `json:"token,omitempty"`
 	Refresh_Token string `json:"refresh_token,omitempty"`
 	Id            int    `json:"id"`
@@ -46,6 +48,15 @@ type Chirp struct {
 	Author_Id int    `json:"author_id"`
 	Body      string `json:"body"`
 	Id        int    `json:"id"`
+}
+
+type DataStruct struct {
+	User_id int `json:"user_id"`
+}
+
+type UpgradeUserStruct struct {
+	Event string     `json:"event"`
+	Data  DataStruct `json:"data"`
 }
 
 // NewDB Create a new database connection
@@ -76,8 +87,9 @@ func (db *DB) Login(email, password string) (UserReturn, error) {
 	for _, value := range dbStructure.Users {
 		if value.Email == email && value.Password == password {
 			return UserReturn{
-				Id:    value.Id,
-				Email: value.Email,
+				Id:            value.Id,
+				Email:         value.Email,
+				Is_Chirpy_Red: value.Is_Chirpy_Red,
 			}, nil
 		}
 	}
@@ -101,9 +113,10 @@ func (db *DB) CreateUser(email string, password string) (UserReturn, error) {
 
 	size := len(dbStructure.Users)
 	newUser := User{
-		Id:       size + 1,
-		Email:    email,
-		Password: password,
+		Id:            size + 1,
+		Email:         email,
+		Password:      password,
+		Is_Chirpy_Red: false,
 	}
 	dbStructure.Users[newUser.Id] = newUser
 
@@ -128,9 +141,10 @@ func (db *DB) UpdateUser(u User) (User, error) {
 		if value.Id == u.Id {
 			// update user
 			updatedUser := User{
-				Id:       value.Id,
-				Email:    u.Email,
-				Password: u.Password,
+				Id:            value.Id,
+				Email:         u.Email,
+				Password:      u.Password,
+				Is_Chirpy_Red: value.Is_Chirpy_Red,
 			}
 			dbStructure.Users[key] = updatedUser
 
@@ -387,4 +401,33 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 
 	db.mux.Unlock()
 	return nil
+}
+
+func (db *DB) UpgradeUser(obj UpgradeUserStruct) (User, error) {
+	userId := obj.Data.User_id
+
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	for key, value := range dbStructure.Users {
+		if value.Id == userId {
+			dbStructure.Users[key] = User{
+				Email:         value.Email,
+				Password:      value.Password,
+				Is_Chirpy_Red: true,
+				Id:            value.Id,
+			}
+
+			err = db.writeDB(dbStructure)
+			if err != nil {
+				return User{}, err
+			}
+
+			return value, nil
+		}
+	}
+
+	return User{}, errors.New("user not found")
 }

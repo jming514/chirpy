@@ -16,12 +16,26 @@ tests:
             Content-Type: application/json
           json:
             email: walt@breakingbad.com
-            password: "123457"
+            password: "123456"
           check:
             status: 201
             jsonpath:
               $.email: walt@breakingbad.com
               $.id: 1
+              $.is_chirpy_red: false
+
+      - name: call webhook payment_failed
+        http:
+          url: /api/polka/webhooks
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            data:
+              user_id: 1
+            event: "user.payment_failed"
+          check:
+            status: 200
 
       - name: Login as user
         http:
@@ -31,9 +45,38 @@ tests:
             Content-Type: application/json
           json:
             email: walt@breakingbad.com
-            password: "123457"
+            password: "123456"
           captures:
             token:
               jsonpath: $.token
           check:
             status: 200
+            $.email: walt@breakingbad.com
+            $.id: 1
+            $.is_chirpy_red: false
+
+      - name: call webhook upgraded
+        http:
+          url: /api/polka/webhooks
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            data:
+              user_id: 1
+            event: "user.upgraded"
+
+      - name: Login as user
+        http:
+          url: /api/login
+          method: POST
+          headers:
+            Content-Type: application/json
+          json:
+            email: walt@breakingbad.com
+            password: "123456"
+          check:
+            status: 200
+            $.email: walt@breakingbad.com
+            $.id: 1
+            $.is_chirpy_red: true

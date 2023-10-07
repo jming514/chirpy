@@ -67,6 +67,8 @@ func main() {
 	apiR.Post("/login", cfg.login)
 	apiR.Post("/refresh", cfg.refresh)
 	apiR.Post("/revoke", cfg.revokeToken)
+
+	apiR.Post("/polka/webhooks", cfg.webhooks)
 	r.Mount("/api", apiR)
 
 	adminR := chi.NewRouter()
@@ -81,6 +83,31 @@ func main() {
 
 	log.Printf("Server started at %s", httpServer.Addr)
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (cfg *apiConfig) webhooks(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	params := database.UpgradeUserStruct{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, 500, "Error decoding parameters...")
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		respondWithJSON(w, 200, "ok")
+		return
+	}
+
+	user, err := cfg.DB.UpgradeUser(params)
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, 500, "cannot upgrade user")
+		return
+	}
+
+	respondWithJSON(w, 200, user)
 }
 
 func checkToken(r *http.Request, tokenType string) (string, error) {
