@@ -303,13 +303,14 @@ func (cfg *apiConfig) chirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
-	allChirps, err := cfg.DB.GetChirps()
+	authorId := r.URL.Query().Get("author_id")
+
+	allChirps, err := cfg.DB.GetChirps(authorId)
 	if err != nil {
 		log.Printf("Error getting chirps: %s\n", err)
 		respondWithError(w, 500, "Cannot get chirps")
 		return
 	}
-
 	respondWithJSON(w, 200, allChirps)
 }
 

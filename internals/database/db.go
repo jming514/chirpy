@@ -260,7 +260,16 @@ func (db *DB) GetUsers() ([]User, error) {
 }
 
 // GetChirps returns all chirps in the database
-func (db *DB) GetChirps() ([]Chirp, error) {
+func (db *DB) GetChirps(authorId string) ([]Chirp, error) {
+	var id int
+	var err error
+
+	if len(authorId) == 0 {
+		id = 0
+	} else {
+		id, err = strconv.Atoi(authorId)
+	}
+
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return []Chirp{}, err
@@ -268,7 +277,13 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 
 	var respSlice []Chirp
 	for _, v := range dbStructure.Chirps {
-		respSlice = append(respSlice, v)
+		if id == 0 {
+			respSlice = append(respSlice, v)
+		} else {
+			if v.Author_Id == id {
+				respSlice = append(respSlice, v)
+			}
+		}
 	}
 	sort.Slice(respSlice, func(i, j int) bool { return respSlice[i].Id < respSlice[j].Id })
 
